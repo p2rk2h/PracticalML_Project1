@@ -1,0 +1,195 @@
+---
+title: 'Johns Hopkins University Coursera: Practical Machine Learning (Project 1: 2015 February)'
+output: html_document
+---
+<br> </br>
+
+## Executive Summary
+
+Three machine-learning classification algorithms and their predictions are examined and compared on a training and test dataset from the Weight Lifting Exercise Dataset.  All the 3 algorithms of *K-Nearest Neighbot*, *SVM Radial*, and *Random Forest* predicted well on the 20 testing cases, all giving identical prediction on identifying from among the 5 activitiesi being monitored.  The training accuracies after a 3-fold cross validation are respectively 91%, 93%, and 99%, indicating that *Random Forest* classification is preferred for this dataset.  Resulting 20 prediction activity results are written in separate individual text files.
+<br> </br>
+
+## Overview
+
+This course project for Practical Machine Learning by Johns Hopkins University Coursera is to analyze the data from acceleromter activities of Weight Lifting Excercise Dataset (see the URL link below) using machine learning modeling to predict 20 different test cases.
+
+### Assignment Context
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now possible to collect a large amount of data about personal activity relatively inexpensively.  These type of devices are part of the quantified self movement –- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.  One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.  In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.  They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.  More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset)
+
+The training and testing data for this project are available from: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data come from this source: http://groupware.les.inf.puc-rio.br/har
+
+### Assignment Question
+
+The goal of the project is to predict the manner in which they did the exercise.  This is the "classe" variable in the training set.  You may use any of the other variables to predict with.  You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did.  You will also use your prediction model to predict 20 different test cases. 
+
+1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+<br> </br>
+
+## Summary of Data Preparation and Analysis
+
+Detailed preliminary analyses (not shown for brevity) indicate the use of known data columns for outcome and non-predictor variables.  Though tree classification was also examined and resulted in the same prediction, it's omitted here for brevity.  The analyses below start with the following data initialization and reduction:
+
+```{r}
+# initialize
+library( caret )
+dwldUrl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn'
+subDir <- '.'	# default current working directory
+trainFl <- 'pml-training.csv'
+testFl <- 'pml-testing.csv'
+```
+<br> </br>
+
+```{r}
+# load training and testing data
+source( 'ldPmlPrjDat.R' )	# a utility function
+trainPml <- ldPmlPrjDat( trainFl , subDir , paste( dwldUrl , trainFl , sep = '/' ) )
+testPml <- ldPmlPrjDat( testFl , subDir , paste( dwldUrl , testFl , sep = '/' ) )
+dim( trainPml ) ; dim( testPml )	# initial number of rows and columns
+```
+<br> </br>
+
+## Data Filtering:
+```{r}
+# data filtering to remove any NA or empty strings so no imputing is required
+trainPmlF <- trainPml[ , ! sapply( trainPml , function( x ) { any( is.na( x ) || x == '' ) } ) ]
+testPmlF <- testPml[ , ! sapply( testPml , function( x ) { any( is.na( x ) || x == '' ) } ) ]
+dim( trainPmlF ) ; dim( testPmlF )	# updated number of rows and columns
+```
+<br> </br>
+
+## Data Cleaning:
+```{r}
+# remove columns which are known to be non-predictor variables
+noPrdctrVar <- c( 'X' , 'user_name' , 'raw_timestamp_part_1' , 'raw_timestamp_part_2' , 'cvtd_timestamp' , 'new_window' , 'num_window' )
+trainPmlF <- trainPmlF[ , - which( colnames( trainPmlF ) %in% noPrdctrVar ) ]
+testPmlF <- testPmlF[ , - which( colnames( testPmlF ) %in% noPrdctrVar ) ]
+dim( trainPmlF ) ; dim( testPmlF )	# updated number of rows and columns
+```
+<br> </br>
+
+## Exploraroty Data Preparation:
+```{r}
+# check for training and testing dataset for differing column names
+nmNotSame <- ( colnames( trainPmlF ) != colnames( testPmlF ) )
+which( nmNotSame == TRUE )	# column indices, if any, where names differ
+
+# name of outcome variable for training dataset
+colnames( trainPmlF )[ nmNotSame ]
+
+# name of outcome variable for testing dataset
+colnames( testPmlF )[ nmNotSame ]
+
+# ensure training data's outcome classe is a factor
+trainPmlF$classe <- as.factor( trainPmlF$classe ) 
+str( trainPmlF$classe )
+```
+<br> </br>
+
+## Cross-Validation Models on Training Dataset:
+```{r}
+# use 3-fold cross validation with trainControl on 3 classifier algorithms, K-Nearest Neighbors, SVM Radial, and Random Forest
+cvTrnCtl3 <- trainControl( method = 'cv' , number = 3 , verboseIter = TRUE )
+```
+<br> </br>
+
+### Algorithm 1: *KNN* on training dataset
+```{r}
+mdlKnn <- train( classe ~ . , data = trainPmlF , method = 'knn' , trControl = cvTrnCtl3 )
+str( mdlKnn$results )
+```
+<br> </br>
+
+### Algorithm 2: *SVM Radial* on training dataset
+```{r}
+mdlSvm <- train( classe ~ . , data = trainPmlF , method = 'svmRadial' , trControl = cvTrnCtl3 )
+str( mdlSvm$results )
+```
+<br> </br>
+
+### Algorithm 3: *Random Forest* on training dataset
+```{r}
+mdlRf <- train( classe ~ . , data = trainPmlF , method = 'rf' , trControl = cvTrnCtl3 )
+str( mdlRf$results )
+```
+<br> </br>
+
+### tabulate and compare accuracy
+```{r}
+data.frame( Model = c( 'KNN' , 'SVM Radial' , 'Random Forest' ) , Accuracy = c( round( max( head( mdlKnn$results )$Accuracy ) , 3 ) , round( max( head( mdlSvm$results )$Accuracy ) , 3 ) , round( max( head( mdlRf$results )$Accuracy ) , 3 ) ) )
+```
+<br> </br>
+
+## Predictions on Testing Dataset:
+
+Each of the 3 models are applied on the test dataset to predict among the 5 acitivities:
+
+```{r}
+# run predictions with the 3 models on the 20-case test dataset
+prdTstKnn <- predict( mdlKnn , testPmlF )
+prdTstSvm <- predict( mdlSvm , testPmlF )
+prdTstRf <- predict( mdlRf , testPmlF )
+
+# print the resulting predictions
+prdTstKnn ; prdTstSvm ; prdTstRf
+```
+<br> </br>
+
+### Check for Overall Agreement among the 3 Predictions
+```{r}
+# tabulate and check for consistency in predictions by the 3 models
+prdTstPml3 <- data.frame( knn = prdTstKnn , svm = prdTstSvm , rf = prdTstRf )
+dim( prdTstPml3 )
+
+# recheck row by row for agreement into a new column
+prdTstPml3$agree <- ( ( ( prdTstPml3[ , 'knn' ] == prdTstPml3[ , 'svm' ] ) + ( prdTstPml3[ , 'svm' ] == prdTstPml3[ , 'rf' ] ) ) == 2 )
+prdTstPml3	# table with last column showing each row's agreement
+```
+<br> </br>
+
+```{r}
+prdTstPml3AllEq <- ( prdTstPml3[ , 'knn' ] == prdTstPml3[ , 'svm' ] && prdTstPml3[ , 'svm' ] == prdTstPml3[ , 'rf' ] )
+prdTstPml3AllEq	# overall agreement
+```
+<br> </br>
+
+## Summary of Prediction Results
+
+All 3 algorithms produced the same consistent prediction on the 20-case testing dataset.  The prediction results of *Random Forest* classification with the highest accuracy of 99% are used to summarize the predicted activities of the 20 test cases.
+
+```{r}
+# prediction matrix of each testing problem_id on training classe
+prdTstPmlRfMtrx <- with( testPmlF , table( classe = prdTstRf , probID = problem_id ) )
+prdTstPmlRfMtrx
+```
+<br> </br>
+
+```{r}
+# Testing Prediction Files:
+pml_write_files = function( x , pth = '.' ) {	# def path is cwd
+	n = length( x )
+	for( i in 1:n ) {
+		filename = paste0( 'problem_id_' , i , '.txt' )
+		write.table( x[ i ] , file = file.path( pth , filename ) , quote = FALSE , row.names = FALSE , col.names = FALSE )
+	}
+}
+  
+pml_write_files( prdTstPml3$rf )
+```
+<br> </br>
+
+### gitHub commit files:
+
+GitHub repository *PracticalML_Project1* contains the following files:
+
+* proj1_pml_practML.Rmd
+* README.md
+* ldPmlPrjDat.R
+* provlem_id_*.txt
+<br> </br>
